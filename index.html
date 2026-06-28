@@ -1,104 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Offline Runner</title>
 <style>
-  html, body {
-    margin: 0; padding: 0; overflow: hidden; height: 100%;
-    background: #f7f7f7; font-family: system-ui, sans-serif;
-    touch-action: none; /* stops page scroll on tap */
-  }
-  canvas {
-    display: block; margin: 0 auto; background: #fff;
-    image-rendering: pixelated;
-  }
-  #overlay {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; text-align: center;
-    background: #f7f7f7; color: #535353; z-index: 10;
-  }
-  #overlay h1 { font-size: 40px; margin: 0; }
-  #overlay p { font-size: 14px; margin: 8px 0 0; }
-  #btns {
-    position: absolute; bottom: 20px; left: 0; right: 0;
-    display: flex; justify-content: space-between; padding: 0 20px; z-index: 5;
-  }
-  .btn {
-    width: 80px; height: 80px; border-radius: 50%;
-    background: #53535320; border: 2px solid #535353;
-    color: #535353; font-size: 14px; font-weight: bold;
-    display: flex; align-items: center; justify-content: center;
-    user-select: none;
-  }
-  .hide { display: none !important; }
+ body{margin:0;background:#f7f7f7;font-family:sans-serif;overflow:hidden;touch-action:none}
+ canvas{display:block;background:#fff;margin:0 auto}
+ #box{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f7f7f7;color:#535353;z-index:99}
+ button{padding:16px 32px;font-size:18px;border:2px solid #535353;background:#fff;border-radius:8px;margin-top:12px}
+ #score{position:absolute;top:10px;right:10px;font:16px monospace;color:#535353}
 </style>
 </head>
 <body>
-<div id="overlay">
+<div id="box">
   <h1>☠️ No Internet ☠️</h1>
-  <p>Tap SCREEN to Start<br>TAP TOP = Jump | HOLD BOTTOM = Duck<br>R to Restart on PC</p>
+  <p>Tap = Jump | Hold = Duck</p>
+  <button id="start">START</button>
 </div>
-<canvas id="game"></canvas>
-
-<div id="btns" class="hide">
-  <div class="btn" id="duckBtn">DUCK</div>
-  <div class="btn" id="jumpBtn">JUMP</div>
-</div>
-
+<canvas id="c"></canvas>
+<div id="score"></div>
 <script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
-const btns = document.getElementById('btns');
+const c=document.getElementById('c'),x=c.getContext('2d');
+const box=document.getElementById('box'),scoreEl=document.getElementById('score');
+function resize(){c.width=innerWidth;c.height=300}
+resize();addEventListener('resize',resize);
 
-// Make canvas fit phone + desktop
-function resize() {
-  canvas.width = Math.min(window.innerWidth, 900);
-  canvas.height = Math.min(window.innerHeight, 300);
+let run=0,s=0,sp=5,obs=[],y=250,vy=0,j=0,d=0;
+const G=0.8,GY=()=>c.height-50;
+
+document.getElementById('start').onclick=()=>{box.style.display='none';run=1};
+c.onpointerdown=e=>{if(!run)return start();const t=e.clientY<c.height/2?jump():duck(1)}
+c.onpointerup=()=>duck(0);
+
+function start(){run=1;box.style.display='none';s=0;sp=5;obs=[];y=GY()-40;vy=0;j=0}
+function jump(){if(!j){vy=-14;j=1}}
+function duck(v){d=v}
+
+function loop(){
+ if(run){
+  s+=0.1;sp+=0.0008;
+  vy+=G;y+=vy;
+  const h=d?20:40;if(y>GY()-h){y=GY()-h;j=0;vy=0}
+  if(Math.random()<0.02)obs.push({x:c.width,y:d?GY()-20:GY()-30,w:20,h:d?20:30});
+  obs.forEach(o=>o.x-=sp);obs=obs.filter(o=>o.x>-20);
+  obs.forEach(o=>{if(50<o.x+o.w&&50+40>o.x&&y<o.y+o.h&&y+h>o.y)die()})
+ }
+ x.clearRect(0,0,c.width,c.height);
+ x.fillStyle='#e0e0e0';x.fillRect(0,GY(),c.width,2);
+ x.fillStyle='#535353';
+ x.fillRect(50,d?y+20:y,40,d?20:40); // player
+ obs.forEach(o=>x.fillRect(o.x,o.y,o.w,o.h)); // obstacles
+ scoreEl.textContent='SCORE '+Math.floor(s);
+ requestAnimationFrame(loop);
 }
-resize();
-window.addEventListener('resize', resize);
-
-let gameState = 'ready'; // ready, playing, dead
-let score = 0;
-let highScore = localStorage.getItem('offlineHigh') || 0;
-let speed = 6;
-let frame = 0;
-
-const GROUND_Y = () => canvas.height - 50;
-const GRAVITY = 0.8;
-
-// Player
-const player = {
-  x: 50, y: 0, w: 40, h: 40,
-  vy: 0, jumping: false, ducking: false
-};
-player.y = GROUND_Y() - player.h;
-
-// Game objects
-let obstacles = [];
-let clouds = [{x:200,y:40},{x:500,y:20},{x:750,y:60}];
-
-// Controls
-function jump() {
-  if(gameState === 'playing' && !player.jumping) {
-    player.vy = -14;
-    player.jumping = true;
-  }
-}
-function duck(state) {
-  if(gameState === 'playing') player.ducking = state;
-}
-
-// Keyboard for PC
-const keys = {};
-document.addEventListener('keydown', e => {
-  keys[e.code] = true;
-  if((e.code === 'Space' || e.code === 'ArrowUp') && gameState !== 'playing') startGame();
-  if(e.code === 'ArrowDown') duck(true);
-  if(e.code === 'KeyR' && gameState === 'dead') startGame();
-});
-document.addEventListener('keyup', e => {
-  if
+function die(){run=0;box.style.display='flex';box.innerHTML=`<h1>Game Over</h1><p>Score: ${Math.floor(s)}</p><button onclick="location.reload()">RESTART</button>`}
+loop();
+</script>
+</body>
+</html>
