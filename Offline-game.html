@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chrome Offline Runner</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #f7f7f7; font-family: system-ui, sans-serif;
+  }
+  canvas {
+    display: block; margin: 0 auto; background: #fff;
+    image-rendering: pixelated;
+  }
+  #overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: #f7f7f7; color: #535353;
+  }
+  #overlay h1 { font-size: 48px; margin: 0; }
+  #overlay p { font-size: 16px; margin: 8px 0 0; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <h1>☠️ No Internet ☠️</h1>
+  <p>Press SPACE or UP to Start<br>DOWN to Duck | R to Restart</p>
+</div>
+<canvas id="game" width="900" height="300"></canvas>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+let gameState = 'ready'; // ready, playing, dead
+let score = 0;
+let highScore = localStorage.getItem('offlineHigh') || 0;
+let speed = 6;
+let frame = 0;
+
+const GROUND_Y = 250;
+const GRAVITY = 0.8;
+
+// Player
+const player = {
+  x: 50, y: GROUND_Y - 40, w: 40, h: 40,
+  vy: 0, jumping: false, ducking: false
+};
+
+// Game objects
+let obstacles = [];
+let clouds = [{x:200,y:40},{x:500
